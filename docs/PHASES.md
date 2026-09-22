@@ -17,7 +17,7 @@ Deliverables:
 
 Gate: normal and sanitizer tests pass; malformed runtime actions cannot access memory outside registered regions or exceed their instruction limit.
 
-## Phase 2 — load-time verifier and restricted SDK
+## Phase 2 — load-time verifier and restricted SDK — complete
 
 **Goal:** prove accepted programs safe before execution and establish the authoring path.
 

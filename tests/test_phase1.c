@@ -5,6 +5,7 @@
 #include "rtbpf/maps.h"
 #include "rtbpf/net.h"
 #include "rtbpf/program.h"
+#include "rtbpf/verifier.h"
 #include "static_programs.h"
 
 #include <stdio.h>
@@ -106,12 +107,17 @@ static void test_runtime_bad_access_is_contained(void)
         .instruction_count = 4u, .maximum_executed_instructions = 4u,
         .stack_size = RTBPF_DEFAULT_STACK_SIZE,
     };
+    rtbpf_verify_report_t report;
+    CHECK(rtbpf_verify_program(&program, &report) == RTBPF_VERIFY_PACKET_BOUNDS);
     rtbpf_net_hook_t hook;
     rtbpf_net_hook_init(&hook, RTBPF_LINK_WIFI_ETHERNET, RTBPF_NET_DROP);
-    CHECK(rtbpf_net_hook_attach_static(&hook, &program) == 0);
-    rtbpf_net_packet_t packet = packet_of(NULL, 0u);
-    CHECK(rtbpf_net_hook_run(&hook, &packet) == RTBPF_NET_DROP);
-    CHECK(hook.stats.aborted == 1u && hook.stats.bad_access_faults == 1u);
+    CHECK(rtbpf_net_hook_attach_static(&hook, &program) != 0);
+
+    rtbpf_runner_t runner;
+    rtbpf_runner_init(&runner);
+    rtbpf_net_md_v1_t context = {0};
+    rtbpf_vm_result_t result = rtbpf_interpret(&runner, &program, &context, NULL, 0u);
+    CHECK(result.status == RTBPF_VM_BAD_ACCESS);
 }
 
 static void test_watchdog(void)
@@ -122,13 +128,14 @@ static void test_watchdog(void)
         .instruction_count = 1u, .maximum_executed_instructions = 7u,
         .stack_size = RTBPF_DEFAULT_STACK_SIZE,
     };
-    rtbpf_net_hook_t hook;
-    rtbpf_net_hook_init(&hook, RTBPF_LINK_WIFI_ETHERNET, RTBPF_NET_DROP);
-    CHECK(rtbpf_net_hook_attach_static(&hook, &program) == 0);
-    rtbpf_net_packet_t packet = packet_of(NULL, 0u);
-    CHECK(rtbpf_net_hook_run(&hook, &packet) == RTBPF_NET_DROP);
-    CHECK(hook.stats.instruction_limit_faults == 1u);
-    CHECK(hook.stats.maximum_instructions_observed == 7u);
+    rtbpf_verify_report_t report;
+    CHECK(rtbpf_verify_program(&program, &report) == RTBPF_VERIFY_BACK_EDGE);
+    rtbpf_runner_t runner;
+    rtbpf_runner_init(&runner);
+    rtbpf_net_md_v1_t context = {0};
+    rtbpf_vm_result_t result = rtbpf_interpret(&runner, &program, &context, NULL, 0u);
+    CHECK(result.status == RTBPF_VM_LIMIT_EXCEEDED);
+    CHECK(result.executed_instructions == 7u);
 }
 
 static void test_array_map_from_bytecode(void)
@@ -174,19 +181,22 @@ static void test_read_only_map_is_enforced(void)
     static const rtbpf_insn_t insns[] = {
         RTBPF_LD_MAP(1, 0), RTBPF_MOV64_REG(2, 10), RTBPF_ADD64_IMM(2, -4),
         RTBPF_ST_W(2, 0, 0), RTBPF_CALL(RTBPF_HELPER_MAP_LOOKUP),
-        RTBPF_ST_W(0, 0, 99), RTBPF_MOV64_IMM(0, RTBPF_NET_PASS), RTBPF_EXIT(),
+        RTBPF_JEQ_IMM(0, 0, 1), RTBPF_ST_W(0, 0, 99),
+        RTBPF_MOV64_IMM(0, RTBPF_NET_PASS), RTBPF_EXIT(),
     };
     rtbpf_program_t program = {
-        .id = 13u, .instructions = insns, .instruction_count = 8u,
-        .maximum_executed_instructions = 8u, .stack_size = RTBPF_DEFAULT_STACK_SIZE,
+        .id = 13u, .instructions = insns, .instruction_count = 9u,
+        .maximum_executed_instructions = 9u, .stack_size = RTBPF_DEFAULT_STACK_SIZE,
         .map_count = 1u, .maps = { &map },
     };
-    rtbpf_net_hook_t hook;
-    rtbpf_net_hook_init(&hook, RTBPF_LINK_WIFI_ETHERNET, RTBPF_NET_DROP);
-    CHECK(rtbpf_net_hook_attach_static(&hook, &program) == 0);
-    rtbpf_net_packet_t packet = packet_of(NULL, 0u);
-    CHECK(rtbpf_net_hook_run(&hook, &packet) == RTBPF_NET_DROP);
-    CHECK(storage[0] == 0u && hook.stats.bad_access_faults == 1u);
+    rtbpf_verify_report_t report;
+    CHECK(rtbpf_verify_program(&program, &report) == RTBPF_VERIFY_MAP_READ_ONLY);
+    rtbpf_runner_t runner;
+    rtbpf_runner_init(&runner);
+    rtbpf_net_md_v1_t context = {0};
+    rtbpf_vm_result_t result = rtbpf_interpret(&runner, &program, &context, NULL, 0u);
+    CHECK(result.status == RTBPF_VM_BAD_ACCESS);
+    CHECK(storage[0] == 0u);
 }
 
 static void test_bad_opcode_and_link_profile(void)
@@ -196,14 +206,16 @@ static void test_bad_opcode_and_link_profile(void)
         .id = 14u, .instructions = insns, .instruction_count = 1u,
         .maximum_executed_instructions = 1u, .stack_size = RTBPF_DEFAULT_STACK_SIZE,
     };
+    rtbpf_verify_report_t report;
+    CHECK(rtbpf_verify_program(&program, &report) == RTBPF_VERIFY_BAD_OPCODE);
     rtbpf_net_hook_t hook;
     rtbpf_net_hook_init(&hook, RTBPF_LINK_WIFI_ETHERNET, RTBPF_NET_DROP);
-    CHECK(rtbpf_net_hook_attach_static(&hook, &program) == 0);
+    CHECK(rtbpf_net_hook_attach_static(&hook, &program) != 0);
+    CHECK(rtbpf_net_hook_attach_static(&hook, &rtbpf_example_pass_program) == 0);
     rtbpf_net_packet_t packet = packet_of(NULL, 0u);
-    CHECK(rtbpf_net_hook_run(&hook, &packet) == RTBPF_NET_DROP);
     packet.link_type = RTBPF_LINK_RAW_IP;
     CHECK(rtbpf_net_hook_run(&hook, &packet) == RTBPF_NET_DROP);
-    CHECK(hook.stats.aborted == 2u);
+    CHECK(hook.stats.aborted == 1u);
 }
 
 int main(void)

@@ -1,6 +1,6 @@
 # V1 primitive contracts
 
-Status: **Phase-1 implementation baseline**. Dynamic bundles are not compatible until Phase 2/5 assign a versioned serialization.
+Status: **Phase-2 implementation baseline**. A prototype host bundle exists, but dynamic target loading remains deferred to Phase 5.
 
 ## Execution
 
@@ -12,7 +12,7 @@ Status: **Phase-1 implementation baseline**. Dynamic bundles are not compatible 
 - Faults and unknown return values are accounted as `ABORTED`; the trusted hook applies its configured pass/drop fault action.
 - `maximum_executed_instructions` is always enforced, including for built-in programs.
 
-Phase 1 deliberately allows the runtime to encounter loops so the watchdog can be tested. Phase 2 load-time verification will reject backward and self branches.
+The interpreter retains its watchdog and can contain a loop in direct runtime tests. All attachment paths invoke the Phase-2 verifier, which rejects backward and self branches.
 
 ## Memory capabilities
 
@@ -56,7 +56,7 @@ Raw 802.11, radiotap, vendor transport framing, aggregates, and incomplete chain
 
 ## Static attachment
 
-Phase 1 attaches an immutable `rtbpf_program_t` supplied by firmware. Attach/detach is permitted only when the RX worker is quiescent. There is no atomic replacement or grace period yet. Phase 5 replaces this contract with immutable generation publication and reclamation.
+Phase 2 attaches an immutable `rtbpf_program_t` supplied by firmware only after semantic verification succeeds. Verification proves initialized values, context/packet/stack/map bounds, map-null refinement, helper typing, valid actions, acyclic control flow, and an instruction-path bound. Attach/detach is permitted only when the RX worker is quiescent. There is no atomic replacement or grace period yet. Phase 5 replaces this contract with immutable generation publication and reclamation.
 
 With no program attached, the hook passes directly and increments `no_program`.
 

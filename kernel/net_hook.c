@@ -1,4 +1,5 @@
 #include "rtbpf/hook.h"
+#include "rtbpf/verifier.h"
 
 #include <limits.h>
 #include <string.h>
@@ -22,6 +23,10 @@ int rtbpf_net_hook_attach_static(rtbpf_net_hook_t *hook,
         program->maximum_executed_instructions == 0u ||
         program->stack_size == 0u || program->stack_size > RTBPF_MAX_STACK ||
         program->map_count > RTBPF_MAX_PROGRAM_MAPS) {
+        return -1;
+    }
+    rtbpf_verify_report_t report;
+    if (rtbpf_verify_program(program, &report) != RTBPF_VERIFY_OK) {
         return -1;
     }
     hook->program = program;

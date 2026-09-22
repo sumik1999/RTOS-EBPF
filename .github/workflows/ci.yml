@@ -13,3 +13,5 @@ jobs:
         run: make test
       - name: Sanitizer test
         run: make test-sanitize
+      - name: Verifier fuzz smoke test
+        run: make fuzz-smoke
