@@ -74,13 +74,16 @@ The future bundle representation will define canonical little-endian serialized 
 
 ## Driver ownership boundary
 
-The current host launchpad returns an action but does not own or release the driver buffer. A Phase 3 adapter must implement:
+The launchpad returns an action without exposing driver ownership to bytecode. The Phase 3 RX adapter implements:
 
 ```text
-PASS      -> exactly one normal lwIP handoff
-DROP      -> exactly one driver release/requeue
-ABORTED   -> trusted fault action, then exactly one terminal transition
-no hook   -> exactly one normal lwIP handoff
+PASS + handoff taken       -> upper layer owns or has consumed the buffer
+PASS + handoff rejected    -> adapter releases once
+DROP / fail-closed ABORTED -> adapter releases once
+invalid/ISR/disabled frame -> adapter releases once
+no hook                    -> normal handoff path
 ```
 
-`private_buffer_handle` remains adapter-only and is never copied into the VM-visible context.
+A handoff callback must explicitly distinguish `RTBPF_HANDOFF_TAKEN` from `RTBPF_HANDOFF_REJECTED`. “Taken” includes an upper layer that rejected a pbuf but already consumed/released it internally; this prevents a second release by the adapter.
+
+`private_buffer_handle` remains adapter-only and is never copied into the VM-visible context. The ST67 glue retains it only in a trusted fixed-pool custom-pbuf wrapper until lwIP finishes.

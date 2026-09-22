@@ -6,7 +6,7 @@ This repository implements [the RTBPF-NET architecture](docs/reference/STM32_DYN
 
 ## Current status
 
-**Phases 1 and 2 complete: static core, verifier, and authoring prototype.** The repository currently provides:
+**Phases 1 and 2 complete; Phase 3 software implemented with hardware validation pending.** The repository currently provides:
 
 - stable eight-byte instruction and `RTBPF_NET_MD_V1` definitions;
 - a portable interpreter with eleven registers and a 512-byte static runner stack;
@@ -17,9 +17,13 @@ This repository implements [the RTBPF-NET architecture](docs/reference/STM32_DYN
 - a single-runner static `NET_RX` launchpad with mandatory verification and fault counters;
 - a restricted program SDK and example C filter;
 - a strict ELF inspector and prototype compact bundle packer;
-- negative, packer, sanitizer, and fuzz-smoke tests.
+- an allocation-free RX ownership adapter with cycle and fault telemetry;
+- an STM32H5 DWT/ISR/cache portability layer;
+- station/AP integration glue for X-CUBE-ST67W61 V1.3.0 T02 before lwIP;
+- a fixed custom-pbuf wrapper pool and exactly-once W6 buffer release model;
+- negative, ownership, X-CUBE-stub, packer, sanitizer, and fuzz-smoke tests.
 
-It does **not** yet include a dynamic target bundle loader, STM32 port, ST67 adapter, signature verification, or persistent update slots.
+It does **not** yet include hardware validation, a dynamic target bundle loader, signature verification, or persistent update slots. See [the Phase 3 report](docs/PHASE_3_REPORT.md) and [X-CUBE integration guide](integration/x-cube-st67w61/README.md).
 
 ## Build and test
 
@@ -44,11 +48,14 @@ The Phase-2 bundle is a host-tool prototype and is not yet accepted by target fi
 
 ```text
 include/rtbpf/     public ABI and runtime interfaces
-kernel/            interpreter, verifier, maps, and NET_RX launchpad
+kernel/            interpreter, verifier, maps, hook, and RX ownership adapter
+adapters/          network-device-specific portable adapters
+ports/             STM32/CMSIS portability implementations
+integration/       X-CUBE/FreeRTOS/lwIP glue and integration instructions
 examples/          compiled-in bytecode programs
 sdk/               restricted program-facing headers and C examples
 tools/             host ELF inspector and prototype bundle packer
-tests/             unit, negative, sanitizer, packer, and fuzz entry points
+tests/             unit, ownership, stubs, sanitizer, packer, and fuzz tests
 docs/              phase plan, contracts, formats, and completion reports
 ```
 

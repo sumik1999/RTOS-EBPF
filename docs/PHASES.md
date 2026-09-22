@@ -33,7 +33,7 @@ Deliverables:
 
 Gate: every accepted corpus/random program terminates within its bound and agrees with the runtime model.
 
-## Phase 3 — STM32H563 and ST67 T02 packet adapter
+## Phase 3 — STM32H563 and ST67 T02 packet adapter — software implemented; hardware validation pending
 
 **Goal:** execute verified static programs at the real deferred receive hook.
 
